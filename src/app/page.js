@@ -43,11 +43,11 @@ export default function HomePage() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center p-12 bg-gray-50 font-sans">
+    <main className="flex min-h-screen flex-col items-center p-12 font-sans bg-gradient-to-b from-slate-950 to-indigo-950">
       <div className="w-full max-w-4xl">
         {/* Header Section */}
         <header className="text-center mb-10">
-          <h1 className="text-5xl font-bold text-gray-800">Git Archaeologist ⛏️</h1>
+          <h1 className="text-5xl font-bold text-white">Git Archaeologist</h1>
           <p className="text-lg text-gray-600 mt-2">
             Uncover the history of any public Git repository.
           </p>
@@ -60,12 +60,12 @@ export default function HomePage() {
             value={repoUrl}
             onChange={(e) => setRepoUrl(e.target.value)}
             placeholder="Paste a GitHub repository URL (e.g., https://github.com/owner/repo.git)"
-            className="flex-grow p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 transition"
+            className="flex-grow p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 transition placeholder:text-gray-800"
             disabled={isLoading}
           />
           <button
             onClick={handleAnalyze}
-            className="bg-blue-600 text-white font-semibold px-6 py-3 rounded-lg shadow-sm hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+            className="bg-rose-600 text-white font-semibold px-6 py-3 rounded-lg shadow-sm hover:bg-rose-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
             disabled={isLoading}
           >
             {isLoading ? 'Analyzing...' : 'Analyze'}
