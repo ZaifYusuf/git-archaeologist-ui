@@ -36,12 +36,12 @@ export default function HomePage() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-6 font-sans bg-gradient-to-b from-slate-950 to-indigo-950 overflow-y-auto">
+    <main className="flex min-h-screen flex-col items-center justify-start p-6 font-sans bg-gradient-to-b from-slate-950 to-indigo-950 overflow-y-auto">
       <div 
         className={`
           w-full max-w-4xl
-          transition-transform duration-700 ease-in-out
-          ${(isLoading || clusters || error) ? '-translate-y-1/2' : 'translate-y-0'}
+          transition-all duration-700 ease-in-out
+          ${(isLoading || clusters || error) ? 'mt-8' : 'mt-[40vh]'}
         `}
       >
         <header className="text-center mb-10">
