@@ -4,9 +4,29 @@ import { useState } from 'react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
 
+function ClusterList({ items, render, limit = 20 }) {
+  const [open, setOpen] = useState(false);
+  const shown = open ? items : items.slice(0, limit);
+  return (
+    <>
+      <ul className="p-6 list-disc list-inside text-gray-300 space-y-2">
+        {shown.map(render)}
+      </ul>
+      {items.length > limit && (
+        <button
+          onClick={() => setOpen(!open)}
+          className="mx-6 mb-4 text-rose-300 underline"
+        >
+          {open ? 'Show less' : `Show ${items.length - limit} more`}
+        </button>
+      )}
+    </>
+  );
+}
+
 export default function HomePage() {
   const [repoUrl, setRepoUrl] = useState('');
-  const [data, setData] = useState(null); 
+  const [data, setData] = useState(null); // full response from API
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -22,13 +42,10 @@ export default function HomePage() {
         body: JSON.stringify({
           repo_url: repoUrl,
           use_bertopic: true,
-          min_cluster_size: 8
         }),
       });
-
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.detail || `Server error ${res.status}`);
-
       setData(json);
     } catch (e) {
       setError(e.message);
@@ -40,18 +57,21 @@ export default function HomePage() {
   function clustersAsArray(resp) {
     if (!resp?.clusters) return [];
     return Object.keys(resp.clusters)
-      .map((k) => Number(k))
-      .sort((a, b) => a - b)
-      .map((id) => {
-        const messages = resp.clusters[id] || [];
-        const labels = resp.cluster_labels?.[id] || [];
-        const size = resp.cluster_sizes?.[id] ?? messages.length;
-        const avgProb = resp.cluster_avg_prob?.[id] ?? 0;
-        return { id, messages, labels, size, avgProb };
-      });
+      .map(Number)
+      .map((id) => ({
+        id,
+        messages: resp.clusters[id] || [],
+        title: resp.cluster_titles?.[id] || '',
+        keywords: resp.cluster_keywords?.[id] || resp.cluster_labels?.[id] || [],
+        size: resp.cluster_sizes?.[id] ?? (resp.clusters[id]?.length ?? 0),
+        avgProb: resp.cluster_avg_prob?.[id] ?? 0,
+      }))
+      // Sort by size then avg confidence (most useful first)
+      .sort((a, b) => (b.size - a.size) || (b.avgProb - a.avgProb));
   }
 
   const clusters = clustersAsArray(data);
+  const validRepo = /^https?:\/\/github\.com\/[^/]+\/[^/]+/.test(repoUrl);
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-start p-6 font-sans bg-gradient-to-b from-slate-950 to-indigo-950 overflow-y-auto">
@@ -64,10 +84,13 @@ export default function HomePage() {
       >
         <header className="text-center mb-10">
           <h1 className="text-5xl font-bold text-white">Git Archaeologist</h1>
-          <p className="text-lg text-gray-300 mt-2">Uncover the history of any public Git repository.</p>
+          <p className="text-lg text-gray-300 mt-2">
+            Uncover the history of any public Git repository.
+          </p>
         </header>
 
-        <div className="flex flex-col sm:flex-row gap-2">
+        {/* Controls */}
+        <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
           <input
             type="text"
             value={repoUrl}
@@ -79,8 +102,8 @@ export default function HomePage() {
           <button
             onClick={handleAnalyze}
             className="bg-rose-600 text-white font-semibold px-6 py-3 rounded-lg shadow-md hover:bg-rose-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
-            disabled={isLoading || !/^https?:\/\/github\.com\/[^/]+\/[^/]+/.test(repoUrl)}
-            title={!/^https?:\/\/github\.com\/[^/]+\/[^/]+/.test(repoUrl) ? "Enter a valid GitHub repo URL" : ""}
+            disabled={isLoading || !validRepo}
+            title={!validRepo ? "Enter a valid GitHub repo URL" : ""}
           >
             {isLoading ? 'Analyzing...' : 'Analyze'}
           </button>
@@ -122,34 +145,45 @@ export default function HomePage() {
           {clusters.length > 0 && (
             <div className="space-y-6">
               <h2 className="text-3xl font-bold text-white text-center">Commit Clusters</h2>
-              {clusters.map(({ id, messages, labels, size, avgProb }) => (
-                <div key={id} className="bg-slate-800/50 border border-yellow-600/1=40 rounded-lg shadow-xl overflow-hidden">
-                  <div className="bg-black/20 p-4 border-b border-white/10 flex items-center justify-between">
-                    <div>
-                      <h3 className="font-bold text-lg text-rose-300">
-                        {labels.length > 0 ? labels.join(' • ') : `Group ${id + 1}`}
-                      </h3>
-                      <p className="text-gray-400 text-sm">
-                        Topic #{id} • {size} commits • avg conf {(avgProb || 0).toFixed(2)}
-                      </p>
+              {clusters.map(({ id, messages, title, keywords, size, avgProb }) => (
+                <div key={id} className="bg-slate-800/50 border border-white/10 rounded-lg shadow-xl overflow-hidden">
+                  <div className="bg-black/20 p-4 border-b border-white/10">
+                    <h3 className="font-bold text-lg text-rose-300">
+                      {title?.length ? title : (keywords.length ? keywords.join(' • ') : `Topic #${id}`)}
+                    </h3>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {keywords.map((kw, i) => (
+                        <span
+                          key={i}
+                          className="px-2 py-0.5 rounded-full bg-rose-900/30 border border-rose-700 text-rose-200 text-xs"
+                        >
+                          {kw}
+                        </span>
+                      ))}
                     </div>
+                    <p className="text-gray-400 text-sm mt-1">
+                      {size} commits • avg conf {(avgProb || 0).toFixed(2)}
+                    </p>
                   </div>
-                  <ul className="p-6 list-disc list-inside text-gray-300 space-y-2">
-                    {messages.map((commit, index) => (
-                      <li key={index}>{commit}</li>
-                    ))}
-                  </ul>
+
+                  <ClusterList
+                    items={messages}
+                    render={(commit, index) => <li key={index}>{commit}</li>}
+                    limit={20}
+                  />
                 </div>
               ))}
             </div>
           )}
 
-          {/* Empty state */}
           {!isLoading && !error && data && clusters.length === 0 && (
-            <div className="text-center text-gray-300">No clusters found. Try a smaller min_cluster_size.</div>
+            <div className="text-center text-gray-300">
+              No clusters found in this repository.
+            </div>
           )}
         </div>
       </div>
     </main>
   );
 }
+
